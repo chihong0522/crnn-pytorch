@@ -1,7 +1,7 @@
 common_config = {
     'data_dir': 'data/mnt/ramdisk/max/90kDICT32px/',
-    'img_width': 100,
-    'img_height': 32,
+    'img_width': 640,
+    'img_height': 480,
     'map_to_seq_hidden': 64,
     'rnn_hidden': 256,
     'leaky_relu': False,
@@ -9,8 +9,8 @@ common_config = {
 
 train_config = {
     'epochs': 10000,
-    'train_batch_size': 32,
-    'eval_batch_size': 512,
+    'train_batch_size': 8,
+    'val_batch_size': 8,
     'lr': 0.0005,
     'show_interval': 10,
     'valid_interval': 500,
@@ -25,7 +25,7 @@ train_config = {
 train_config.update(common_config)
 
 evaluate_config = {
-    'eval_batch_size': 512,
+    'val_batch_size': 8,
     'cpu_workers': 4,
     'reload_checkpoint': 'checkpoints/crnn_synth90k.pt',
     'decode_method': 'beam_search',
@@ -35,5 +35,5 @@ evaluate_config.update(common_config)
 
 path_config = {
     'train_dataset_dir': '/home/chihung/crnn-pytorch/data/rgbd_dataset_freiburg2_xyz/',
-    'eval_dataset_dir': '/home/chihung/crnn-pytorch/data/rgbd_dataset_freiburg1_xyz/'
+    'val_dataset_dir': '/home/chihung/crnn-pytorch/data/rgbd_dataset_freiburg1_xyz/'
 }

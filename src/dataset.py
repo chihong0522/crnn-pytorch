@@ -100,8 +100,19 @@ def process_associate_txt(dataset_dir, associate_txt):
     return imgs, depths, labls
 
 
+# Create train/valid transforms
+train_transform = trns.Compose([
+    trns.ToTensor(),
+    # trns.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+normalize_transform = trns.Compose([
+    trns.ToTensor(),
+    trns.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+
+
 class TUM_Dataset(Dataset):
-    def __init__(self, split="train", transform=None):
+    def __init__(self, split="train", transform=train_transform):
         """
         :param split: train, dev
         :param transform: Transform preprocessing
@@ -119,7 +130,6 @@ class TUM_Dataset(Dataset):
         self.lbls = torch.tensor(labels, dtype=torch.float32)
         assert len(self.image_paths) == len(self.lbls), 'mismatched dataset length!'
         print('Total data in {} split: {}'.format(split, len(self.image_paths)))
-
 
     def __getitem__(self, index):
         # --------------------------------------------
@@ -140,32 +150,23 @@ class TUM_Dataset(Dataset):
         return len(self.image_paths)
 
 
-# Create train/valid transforms
-train_transform = trns.Compose([
-    trns.ToTensor(),
-    # trns.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-])
-normalize_transform = trns.Compose([
-    trns.ToTensor(),
-    # trns.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-])
+if __name__ == "__main__":
+    # Create train/valid datasets
+    train_set = TUM_Dataset(split='train', transform=train_transform)
+    valid_set = TUM_Dataset(split='eval', transform=train_transform)
 
-# Create train/valid datasets
-train_set = TUM_Dataset(split='train', transform=train_transform)
-valid_set = TUM_Dataset(split='eval', transform=train_transform)
+    # Create train/valid loaders
+    train_loader = DataLoader(
+        dataset=train_set, batch_size=16, shuffle=False, num_workers=4)
+    valid_loader = DataLoader(
+        dataset=valid_set, batch_size=16, shuffle=False, num_workers=4)
 
-# Create train/valid loaders
-train_loader = DataLoader(
-    dataset=train_set, batch_size=16, shuffle=False, num_workers=4)
-valid_loader = DataLoader(
-    dataset=valid_set, batch_size=16, shuffle=False, num_workers=4)
-
-# Get images and labels in a mini-batch of train_loader
-for imgs, lbls in train_loader:
-    # plt.imshow(imgs[0].permute(1,2,0))
-    # plt.show()
-    print('Size of image:', imgs.size())  # batch_size * 3 * 224 * 224
-    # print('Type of image:', imgs.dtype)  # float32
-    print('Size of label:', lbls.size())  # batch_size
-    print('Type of label:', lbls.dtype)  # int64(long)
-    break
+    # Get images and labels in a mini-batch of train_loader
+    for imgs, lbls in train_loader:
+        # plt.imshow(imgs[0].permute(1,2,0))
+        # plt.show()
+        print('Size of image:', imgs.size())  # batch_size * 3 * 224 * 224
+        # print('Type of image:', imgs.dtype)  # float32
+        print('Size of label:', lbls.size())  # batch_size
+        print('Type of label:', lbls.dtype)  # int64(long)
+        break

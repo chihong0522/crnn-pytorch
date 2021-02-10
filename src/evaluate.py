@@ -1,6 +1,5 @@
 import torch
 from torch.utils.data import DataLoader
-from torch.nn import CTCLoss
 from tqdm import tqdm
 
 from dataset import Synth90kDataset, synth90k_collate_fn
@@ -11,14 +10,11 @@ from config import evaluate_config as config
 torch.backends.cudnn.enabled = False
 
 
-def evaluate(crnn, dataloader, criterion,
-             max_iter=None, decode_method='beam_search', beam_size=10):
+def evaluate(crnn, dataloader, criterion, max_iter=None):
     crnn.eval()
 
     tot_count = 0
     tot_loss = 0
-    tot_correct = 0
-    wrong_cases = []
 
     pbar_total = max_iter if max_iter else len(dataloader)
     pbar = tqdm(total=pbar_total, desc="Evaluate")
@@ -29,44 +25,25 @@ def evaluate(crnn, dataloader, criterion,
                 break
             device = 'cuda' if next(crnn.parameters()).is_cuda else 'cpu'
 
-            images, targets, target_lengths = [d.to(device) for d in data]
+            images, targets = [d.to(device) for d in data]
 
-            logits = crnn(images)
-            log_probs = torch.nn.functional.log_softmax(logits, dim=2)
+            prediction = crnn(images)
 
             batch_size = images.size(0)
-            input_lengths = torch.LongTensor([logits.size(0)] * batch_size)
 
-            loss = criterion(log_probs, targets, input_lengths, target_lengths)
-
-            preds = ctc_decode(log_probs, method=decode_method, beam_size=beam_size)
-            reals = targets.cpu().numpy().tolist()
-            target_lengths = target_lengths.cpu().numpy().tolist()
+            loss = criterion(prediction,targets)
 
             tot_count += batch_size
             tot_loss += loss.item()
-            target_length_counter = 0
-            for pred, target_length in zip(preds, target_lengths):
-                real = reals[target_length_counter:target_length_counter + target_length]
-                target_length_counter += target_length
-                if pred == real:
-                    tot_correct += 1
-                else:
-                    wrong_cases.append((real, pred))
-
             pbar.update(1)
         pbar.close()
-
-    evaluation = {
-        'loss': tot_loss / tot_count,
-        'acc': tot_correct / tot_count,
-        'wrong_cases': wrong_cases
-    }
-    return evaluation
+    
+    avg_eval_loss = tot_loss / tot_count
+    return avg_eval_loss
 
 
 def main():
-    eval_batch_size = config['eval_batch_size']
+    val_batch_size = config['val_batch_size']
     cpu_workers = config['cpu_workers']
     reload_checkpoint = config['reload_checkpoint']
 
@@ -81,7 +58,7 @@ def main():
 
     test_loader = DataLoader(
         dataset=test_dataset,
-        batch_size=eval_batch_size,
+        batch_size=val_batch_size,
         shuffle=False,
         num_workers=cpu_workers,
         collate_fn=synth90k_collate_fn)

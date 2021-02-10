@@ -1,21 +1,28 @@
 import torch.nn as nn
+from torch.autograd import Variable
+import torch
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class CRNN(nn.Module):
 
-    def __init__(self, img_channel, img_height, img_width, num_class,
+    def __init__(self, img_channel, img_height, img_width, num_class, batch_size,
                  map_to_seq_hidden=64, rnn_hidden=256, leaky_relu=False):
         super(CRNN, self).__init__()
+
+        self.batch_size = batch_size
 
         self.cnn, (output_channel, output_height, output_width) = \
             self._cnn_backbone(img_channel, img_height, img_width, leaky_relu)
 
         self.map_to_seq = nn.Linear(output_channel * output_height, map_to_seq_hidden)
 
-        self.rnn1 = nn.LSTM(map_to_seq_hidden, rnn_hidden, bidirectional=True)
-        self.rnn2 = nn.LSTM(2 * rnn_hidden, rnn_hidden, bidirectional=True)
+        self.rnn1 = nn.LSTM(map_to_seq_hidden, rnn_hidden, bidirectional=False)
+        self.rnn2 = nn.LSTM(rnn_hidden, rnn_hidden, bidirectional=False)
 
-        self.dense = nn.Linear(2 * rnn_hidden, num_class)
+        self.dense = nn.Linear(rnn_hidden, num_class)
+
+        self.rnn_hidden_size = rnn_hidden
 
     def _cnn_backbone(self, img_channel, img_height, img_width, leaky_relu):
         assert img_height % 16 == 0
@@ -83,8 +90,20 @@ class CRNN(nn.Module):
         conv = conv.permute(2, 0, 1)  # (width, batch, feature)
         seq = self.map_to_seq(conv)
 
-        recurrent, _ = self.rnn1(seq)
-        recurrent, _ = self.rnn2(recurrent)
+        # h_0 = torch.zeros(1,seq.size(1),self.rnn_hidden_size).requires_grad_().to(device)   
+        # c_0 = torch.zeros(1,seq.size(1),self.rnn_hidden_size).requires_grad_().to(device)
 
-        output = self.dense(recurrent)
+        # recurrent, (h_out, _) = self.rnn1(seq,(h_0.detach(), c_0.detach()))
+        # recurrent, _ = self.rnn2(recurrent)
+
+        # recurrent, (h_out, _) = self.rnn1(seq)
+        # h_out = h_out.view(-1, self.rnn_hidden_size)
+
+        lstm_out, self.hidden = self.rnn1(seq,self.hidden)
+        h_out = lstm_out[-1].view(self.batch_size, -1)
+        output = self.dense(h_out)
         return output  # shape: (seq_len, batch, num_class)
+
+    def init_hidden(self):
+        return (Variable(torch.zeros(1,self.batch_size,self.rnn_hidden_size).to(device)),
+        Variable(torch.zeros(1,self.batch_size,self.rnn_hidden_size).to(device)))
