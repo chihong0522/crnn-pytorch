@@ -1,4 +1,3 @@
-
 common_config = {
     'data_dir': 'data/mnt/ramdisk/max/90kDICT32px/',
     'img_width': 100,
@@ -33,3 +32,8 @@ evaluate_config = {
     'beam_size': 10,
 }
 evaluate_config.update(common_config)
+
+path_config = {
+    'train_dataset_dir': '/home/chihung/crnn-pytorch/data/rgbd_dataset_freiburg2_xyz/',
+    'eval_dataset_dir': '/home/chihung/crnn-pytorch/data/rgbd_dataset_freiburg1_xyz/'
+}

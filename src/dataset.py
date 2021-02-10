@@ -1,13 +1,13 @@
 import os
-import glob
-
 import torch
-from torch.utils.data import Dataset
-from scipy import signal
-from scipy.io import wavfile
-import cv2
-from PIL import Image
 import numpy as np
+import torchvision.transforms as trns
+from PIL import Image
+from scipy.io import loadmat
+from torch.utils.data import DataLoader
+from torch.utils.data.dataset import Dataset
+from config import path_config
+import matplotlib.pyplot as plt
 
 
 class Synth90kDataset(Dataset):
@@ -88,3 +88,84 @@ def synth90k_collate_fn(batch):
     targets = torch.cat(targets, 0)
     target_lengths = torch.cat(target_lengths, 0)
     return images, targets, target_lengths
+
+
+def process_associate_txt(dataset_dir, associate_txt):
+    imgs, depths, labls = [], [], []
+    for x in associate_txt:
+        row = x.split(" ")
+        imgs.append(os.path.join(dataset_dir, row[1]))
+        depths.append(os.path.join(dataset_dir, row[3]))
+        labls.append([float(x) for x in row[5:]])
+    return imgs, depths, labls
+
+
+class TUM_Dataset(Dataset):
+    def __init__(self, split="train", transform=None):
+        """
+        :param split: train, dev
+        :param transform: Transform preprocessing
+        """
+        self.transform = transform
+        self.dataset_dir = path_config[f'{split}_dataset_dir']
+
+        # Load image path and annotations
+        associate_txt_path = os.path.join(self.dataset_dir, 'associate_all.txt')
+        with open(associate_txt_path, 'r') as f:
+            images, depths, labels = process_associate_txt(self.dataset_dir, f.readlines())
+
+        self.image_paths = images
+        self.depth_paths = depths
+        self.lbls = torch.tensor(labels, dtype=torch.float32)
+        assert len(self.image_paths) == len(self.lbls), 'mismatched dataset length!'
+        print('Total data in {} split: {}'.format(split, len(self.image_paths)))
+
+
+    def __getitem__(self, index):
+        # --------------------------------------------
+        # 1. Read from file (using numpy.fromfile, PIL.Image.open)
+        # 2. Preprocess the data (torchvision.Transform)
+        # 3. Return the data (e.g. image and label)
+        # --------------------------------------------
+        imgpath = self.image_paths[index]
+        img = Image.open(imgpath).convert('RGB')
+        label = self.lbls[index]
+        img = self.transform(img)
+        return img, label
+
+    def __len__(self):
+        # --------------------------------------------
+        # Indicate the total size of the dataset
+        # --------------------------------------------
+        return len(self.image_paths)
+
+
+# Create train/valid transforms
+train_transform = trns.Compose([
+    trns.ToTensor(),
+    # trns.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+normalize_transform = trns.Compose([
+    trns.ToTensor(),
+    # trns.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
+
+# Create train/valid datasets
+train_set = TUM_Dataset(split='train', transform=train_transform)
+valid_set = TUM_Dataset(split='eval', transform=train_transform)
+
+# Create train/valid loaders
+train_loader = DataLoader(
+    dataset=train_set, batch_size=16, shuffle=False, num_workers=4)
+valid_loader = DataLoader(
+    dataset=valid_set, batch_size=16, shuffle=False, num_workers=4)
+
+# Get images and labels in a mini-batch of train_loader
+for imgs, lbls in train_loader:
+    # plt.imshow(imgs[0].permute(1,2,0))
+    # plt.show()
+    print('Size of image:', imgs.size())  # batch_size * 3 * 224 * 224
+    # print('Type of image:', imgs.dtype)  # float32
+    print('Size of label:', lbls.size())  # batch_size
+    print('Type of label:', lbls.dtype)  # int64(long)
+    break
