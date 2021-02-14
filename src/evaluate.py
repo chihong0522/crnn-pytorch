@@ -24,7 +24,7 @@ def evaluate(crnn, dataloader, criterion):
             device = 'cuda' if next(crnn.parameters()).is_cuda else 'cpu'
 
             previous_images, current_images, targets = [d.to(device) for d in data]
-            batch_size = images.size(0)
+            batch_size = current_images.size(0)
             crnn.hidden = crnn.init_hidden(batch_size=batch_size)
             prediction = crnn(previous_images, current_images)
 
