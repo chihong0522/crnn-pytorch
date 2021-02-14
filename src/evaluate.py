@@ -10,25 +10,22 @@ from config import evaluate_config as config
 torch.backends.cudnn.enabled = False
 
 
-def evaluate(crnn, dataloader, criterion, max_iter=None):
+def evaluate(crnn, dataloader, criterion):
     crnn.eval()
 
     tot_count = 0
     tot_loss = 0
 
-    pbar_total = max_iter if max_iter else len(dataloader)
+    pbar_total = len(dataloader)
     pbar = tqdm(total=pbar_total, desc="Evaluate")
 
     with torch.no_grad():
-        for i, data in enumerate(dataloader):
-            if max_iter and i >= max_iter:
-                break
+        for data in dataloader:
             device = 'cuda' if next(crnn.parameters()).is_cuda else 'cpu'
-
+            crnn.hidden = crnn.init_hidden(batch_size=data[0].size()[0])
             images, targets = [d.to(device) for d in data]
 
             prediction = crnn(images)
-
             batch_size = images.size(0)
 
             loss = criterion(prediction,targets)

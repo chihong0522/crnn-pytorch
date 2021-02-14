@@ -13,7 +13,8 @@ from config import train_config as config
 from tqdm import tqdm
 
 
-def train_batch(crnn, data, optimizer, criterion, device):
+def train_batch(crnn, data, optimizer, criterion, device, batch_size):
+    crnn.hidden = crnn.init_hidden(batch_size=batch_size)
     crnn.train()
 
     images, targets = [d.to(device) for d in data]
@@ -75,16 +76,15 @@ def main():
     assert save_interval % valid_interval == 0
     
     for epoch in range(1, epochs + 1):
-        print(f'Epoch - {epoch}')
+        print(f'Epoch {epoch}')
         tot_train_loss = 0.
         tot_train_count = 0
-        crnn.hidden = crnn.init_hidden()
 
         pbar_total = len(train_loader)
         pbar = tqdm(total=pbar_total, desc="Train")
 
         for train_data in train_loader:
-            loss = train_batch(crnn, train_data, optimizer, criterion, device)
+            loss = train_batch(crnn, train_data, optimizer, criterion, device, train_data[0].size()[0])
             train_size = train_data[0].size(0)
 
             tot_train_loss += loss
@@ -98,7 +98,7 @@ def main():
         if epoch % 10 == 0:
             prefix = 'crnn'
             save_model_path = os.path.join(config['checkpoints_dir'],
-                                            f'{prefix}_{i:06}_evalLoss_{eval_loss}.pt')
+                                            f'{prefix}_{epoch:06}_evalLoss_{eval_loss}.pt')
             torch.save(crnn.state_dict(), save_model_path)
             print('save model at ', save_model_path)
 

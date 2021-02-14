@@ -4,6 +4,7 @@ import torch
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+
 class CRNN(nn.Module):
 
     def __init__(self, img_channel, img_height, img_width, num_class, batch_size,
@@ -15,7 +16,8 @@ class CRNN(nn.Module):
         self.cnn, (output_channel, output_height, output_width) = \
             self._cnn_backbone(img_channel, img_height, img_width, leaky_relu)
 
-        self.map_to_seq = nn.Linear(output_channel * output_height, map_to_seq_hidden)
+        self.map_to_seq = nn.Linear(
+            output_channel * output_height, map_to_seq_hidden)
 
         self.rnn1 = nn.LSTM(map_to_seq_hidden, rnn_hidden, bidirectional=False)
         self.rnn2 = nn.LSTM(rnn_hidden, rnn_hidden, bidirectional=False)
@@ -42,13 +44,15 @@ class CRNN(nn.Module):
 
             cnn.add_module(
                 f'conv{i}',
-                nn.Conv2d(input_channel, output_channel, kernel_sizes[i], strides[i], paddings[i])
+                nn.Conv2d(input_channel, output_channel,
+                          kernel_sizes[i], strides[i], paddings[i])
             )
 
             if batch_norm:
                 cnn.add_module(f'batchnorm{i}', nn.BatchNorm2d(output_channel))
 
-            relu = nn.LeakyReLU(0.2, inplace=True) if leaky_relu else nn.ReLU(inplace=True)
+            relu = nn.LeakyReLU(
+                0.2, inplace=True) if leaky_relu else nn.ReLU(inplace=True)
             cnn.add_module(f'relu{i}', relu)
 
         # size of image: (channel, height, width) = (img_channel, img_height, img_width)
@@ -90,7 +94,7 @@ class CRNN(nn.Module):
         conv = conv.permute(2, 0, 1)  # (width, batch, feature)
         seq = self.map_to_seq(conv)
 
-        # h_0 = torch.zeros(1,seq.size(1),self.rnn_hidden_size).requires_grad_().to(device)   
+        # h_0 = torch.zeros(1,seq.size(1),self.rnn_hidden_size).requires_grad_().to(device)
         # c_0 = torch.zeros(1,seq.size(1),self.rnn_hidden_size).requires_grad_().to(device)
 
         # recurrent, (h_out, _) = self.rnn1(seq,(h_0.detach(), c_0.detach()))
@@ -99,11 +103,12 @@ class CRNN(nn.Module):
         # recurrent, (h_out, _) = self.rnn1(seq)
         # h_out = h_out.view(-1, self.rnn_hidden_size)
 
-        lstm_out, self.hidden = self.rnn1(seq,self.hidden)
+        lstm_out, self.hidden = self.rnn1(seq, self.hidden)
         h_out = lstm_out[-1].view(self.batch_size, -1)
         output = self.dense(h_out)
         return output  # shape: (seq_len, batch, num_class)
 
-    def init_hidden(self):
-        return (Variable(torch.zeros(1,self.batch_size,self.rnn_hidden_size).to(device)),
-        Variable(torch.zeros(1,self.batch_size,self.rnn_hidden_size).to(device)))
+    def init_hidden(self, batch_size):
+        self.batch_size = batch_size
+        return (Variable(torch.zeros(1, batch_size, self.rnn_hidden_size).to(device)),
+                Variable(torch.zeros(1, batch_size, self.rnn_hidden_size).to(device)))
