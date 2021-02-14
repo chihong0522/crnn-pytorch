@@ -13,7 +13,10 @@ class CRNN(nn.Module):
 
         self.batch_size = batch_size
 
-        self.cnn, (output_channel, output_height, output_width) = \
+        self.cnn_1, (output_channel, output_height, output_width) = \
+            self._cnn_backbone(img_channel, img_height, img_width, leaky_relu)
+
+        self.cnn_2, (output_channel, output_height, output_width) = \
             self._cnn_backbone(img_channel, img_height, img_width, leaky_relu)
 
         self.map_to_seq = nn.Linear(
@@ -22,7 +25,7 @@ class CRNN(nn.Module):
         self.rnn1 = nn.LSTM(map_to_seq_hidden, rnn_hidden, bidirectional=False)
         self.rnn2 = nn.LSTM(rnn_hidden, rnn_hidden, bidirectional=False)
 
-        self.dense = nn.Linear(rnn_hidden, num_class)
+        self.dense = nn.Linear(rnn_hidden*2, num_class)
 
         self.rnn_hidden_size = rnn_hidden
 
@@ -84,31 +87,31 @@ class CRNN(nn.Module):
             channels[-1], img_height // 16 - 1, img_width // 4 - 1
         return cnn, (output_channel, output_height, output_width)
 
-    def forward(self, images):
+    def forward(self, image_1, image_2):
         # shape of images: (batch, channel, height, width)
-
-        conv = self.cnn(images)
+        
+        conv = self.cnn_1(image_1)
         batch, channel, height, width = conv.size()
-
         conv = conv.view(batch, channel * height, width)
         conv = conv.permute(2, 0, 1)  # (width, batch, feature)
-        seq = self.map_to_seq(conv)
+        seq_1 = self.map_to_seq(conv)
 
-        # h_0 = torch.zeros(1,seq.size(1),self.rnn_hidden_size).requires_grad_().to(device)
-        # c_0 = torch.zeros(1,seq.size(1),self.rnn_hidden_size).requires_grad_().to(device)
+        conv = self.cnn_2(image_2)
+        batch, channel, height, width = conv.size()
+        conv = conv.view(batch, channel * height, width)
+        conv = conv.permute(2, 0, 1)  # (width, batch, feature)
+        seq_2 = self.map_to_seq(conv)
 
-        # recurrent, (h_out, _) = self.rnn1(seq,(h_0.detach(), c_0.detach()))
-        # recurrent, _ = self.rnn2(recurrent)
+        combined = torch.cat((seq_1,seq_2), dim=1)
 
-        # recurrent, (h_out, _) = self.rnn1(seq)
-        # h_out = h_out.view(-1, self.rnn_hidden_size)
-
-        lstm_out, self.hidden = self.rnn1(seq, self.hidden)
+        lstm_out, self.hidden = self.rnn1(combined, self.hidden)
         h_out = lstm_out[-1].view(self.batch_size, -1)
         output = self.dense(h_out)
+
         return output  # shape: (seq_len, batch, num_class)
 
     def init_hidden(self, batch_size):
+        self.input = torch.zeros(())
         self.batch_size = batch_size
-        return (Variable(torch.zeros(1, batch_size, self.rnn_hidden_size).to(device)),
-                Variable(torch.zeros(1, batch_size, self.rnn_hidden_size).to(device)))
+        return (Variable(torch.zeros(1, batch_size*2, self.rnn_hidden_size).to(device)),
+                Variable(torch.zeros(1, batch_size*2, self.rnn_hidden_size).to(device)))

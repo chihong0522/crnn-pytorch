@@ -137,11 +137,18 @@ class TUM_Dataset(Dataset):
         # 2. Preprocess the data (torchvision.Transform)
         # 3. Return the data (e.g. image and label)
         # --------------------------------------------
-        imgpath = self.image_paths[index]
-        img = Image.open(imgpath).convert('RGB')
         label = self.lbls[index]
-        img = self.transform(img)
-        return img, label
+
+        imgpath_1 = self.image_paths[index]
+        img_1 = Image.open(imgpath_1).convert('RGB')
+
+        if index == 0:
+            img_0 = img_1
+        else:
+            imgpath_0 = self.image_paths[index-1]
+            img_0 = Image.open(imgpath_0).convert('RGB')
+
+        return self.transform(img_0), self.transform(img_1), label
 
     def __len__(self):
         # --------------------------------------------

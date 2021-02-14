@@ -17,8 +17,8 @@ def train_batch(crnn, data, optimizer, criterion, device, batch_size):
     crnn.hidden = crnn.init_hidden(batch_size=batch_size)
     crnn.train()
 
-    images, targets = [d.to(device) for d in data]
-    prediction = crnn(images)
+    previous_images, current_images, targets = [d.to(device) for d in data]
+    prediction = crnn(previous_images, current_images)
     loss = criterion(prediction,targets)
 
     optimizer.zero_grad()
@@ -84,9 +84,9 @@ def main():
         pbar = tqdm(total=pbar_total, desc="Train")
 
         for train_data in train_loader:
-            loss = train_batch(crnn, train_data, optimizer, criterion, device, train_data[0].size()[0])
             train_size = train_data[0].size(0)
-
+            loss = train_batch(crnn, train_data, optimizer, criterion, device, train_size)
+        
             tot_train_loss += loss
             tot_train_count += train_size
             pbar.update(1)

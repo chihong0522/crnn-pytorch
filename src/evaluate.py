@@ -22,11 +22,11 @@ def evaluate(crnn, dataloader, criterion):
     with torch.no_grad():
         for data in dataloader:
             device = 'cuda' if next(crnn.parameters()).is_cuda else 'cpu'
-            crnn.hidden = crnn.init_hidden(batch_size=data[0].size()[0])
-            images, targets = [d.to(device) for d in data]
 
-            prediction = crnn(images)
+            previous_images, current_images, targets = [d.to(device) for d in data]
             batch_size = images.size(0)
+            crnn.hidden = crnn.init_hidden(batch_size=batch_size)
+            prediction = crnn(previous_images, current_images)
 
             loss = criterion(prediction,targets)
 
